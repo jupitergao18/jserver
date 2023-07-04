@@ -13,6 +13,7 @@ Install JServer
 
 ```
 cargo build --release
+cp target/release/jserver /usr/bin/
 ```
 
 Create a `data.json` file with some data
@@ -39,7 +40,7 @@ jserver
 Now if you go to [http://localhost:2901/api/posts/1](http://localhost:2901/api/posts/1), you'll get
 
 ```json
-{ "id": 1, "title": "json-server", "author": "typicode" }
+{ "id": 1, "title": "jserver", "author": "jupiter.gao" }
 ```
 
 Also when doing requests, it's good to know that:
