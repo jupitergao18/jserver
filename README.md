@@ -1,7 +1,7 @@
 # jserver
-A json api and static files server
+A json api and static files server in rust
 
-Just like json-server (nodejs)
+Just like json-server from typicode (nodejs)
 
 Get a full fake REST API with __zero coding__ in __less than 30 seconds__ (seriously)
 
@@ -20,12 +20,12 @@ Create a `data.json` file with some data
 ```json
 {
   "posts": [
-    { "id": 1, "title": "json-server", "author": "typicode" }
+    { "id": 1, "title": "jserver", "author": "jupiter.gao" }
   ],
   "comments": [
     { "id": 1, "body": "some comment", "postId": 1 }
   ],
-  "profile": { "name": "typicode" },
+  "profile": { "name": "jupiter" },
   "homepage": "https://apicenter.com.cn"
 }
 ```
@@ -97,7 +97,7 @@ jserver --public-path ./some-other-dir
 ## CLI usage
 
 ```
-Usage: jserver.exe [OPTIONS]
+Usage: jserver [OPTIONS]
 
 Options:
   -b, --bind-address <BIND_ADDRESS>  [default: 0.0.0.0:2901]
