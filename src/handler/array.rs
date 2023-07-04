@@ -1,21 +1,147 @@
+use std::cmp::Ordering;
+
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{StatusCode, Uri},
     Json,
 };
-use serde_json::Value;
+use serde::Deserialize;
+use serde_json::{json, Value};
 
 use super::{get_name, AppState};
 
-pub async fn list(uri: Uri, State(app_state): State<AppState>) -> String {
+pub async fn list(
+    uri: Uri,
+    paginate: Option<Query<Paginate>>,
+    sort: Option<Query<Sort>>,
+    slice: Option<Query<Slice>>,
+    State(app_state): State<AppState>,
+) -> Result<String, (StatusCode, String)> {
     let name = get_name(uri);
-    app_state
-        .db_value
-        .read()
-        .await
-        .get(&name)
-        .unwrap()
-        .to_string()
+    let db_value = app_state.db_value.read().await;
+    let values = db_value.get(&name).unwrap();
+    if !values.is_array() {
+        return Err((StatusCode::BAD_REQUEST, "key is not array".to_string()));
+    }
+    let (sorts, orders) = if let Some(sort) = sort {
+        let mut sorts = sort
+            .sort
+            .split(',')
+            .map(|i| i.to_string())
+            .collect::<Vec<String>>();
+        let mut orders = sort
+            .order
+            .split(',')
+            .map(|i| i.to_string())
+            .collect::<Vec<String>>();
+        if sorts.len() != orders.len() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "sort and order length not match".to_string(),
+            ));
+        }
+        sorts.reverse();
+        orders.reverse();
+        (sorts, orders)
+    } else {
+        (Vec::new(), Vec::new())
+    };
+
+    if paginate.is_some() && slice.is_some() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "paginate and slice can not use together".to_string(),
+        ));
+    }
+
+    if let Some(slice) = slice.clone() {
+        if slice.end.is_none() && slice.limit.is_none() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "slice end and limit can not both be none".to_string(),
+            ));
+        }
+        if let Some(end) = slice.end {
+            if slice.start > end {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "slice start must less than end".to_string(),
+                ));
+            }
+        }
+        if let Some(limit) = slice.limit {
+            if limit == 0 {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "slice limit can not be zero".to_string(),
+                ));
+            }
+        }
+    }
+
+    if let Some(paginate) = paginate.clone() {
+        if paginate.size == 0 {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "paginate size can not be zero".to_string(),
+            ));
+        }
+    }
+
+    let mut values_clone = values.clone();
+    let values = values_clone.as_array_mut().unwrap();
+
+    //1、filter
+    //2、sort
+    for (sort, order) in sorts.iter().zip(orders.iter()) {
+        values.sort_by(|a, b| {
+            let a = a.get(sort).unwrap();
+            let b = b.get(sort).unwrap();
+            if a.is_number() && b.is_number() {
+                let a = a.as_f64().unwrap();
+                let b = b.as_f64().unwrap();
+                if order == "asc" {
+                    a.partial_cmp(&b).unwrap()
+                } else {
+                    b.partial_cmp(&a).unwrap()
+                }
+            } else if a.is_string() && b.is_string() {
+                let a = a.as_str().unwrap();
+                let b = b.as_str().unwrap();
+                if order == "asc" {
+                    a.partial_cmp(b).unwrap()
+                } else {
+                    b.partial_cmp(a).unwrap()
+                }
+            } else {
+                Ordering::Equal
+            }
+        });
+    }
+    //3、page or slice
+    let (start, end) = if let Some(paginate) = paginate {
+        (
+            paginate.page * paginate.size,
+            paginate.page * paginate.size + paginate.size,
+        )
+    } else if let Some(slice) = slice {
+        if let Some(end) = slice.end {
+            (slice.start, end)
+        } else {
+            (slice.start, slice.start + slice.limit.unwrap())
+        }
+    } else {
+        (0, 20)
+    };
+
+    if start >= values.len() {
+        return Ok(json!(Vec::<Value>::new()).to_string());
+    }
+    if end > values.len() {
+        return Ok(json!(values[start..].to_vec()).to_string());
+    }
+
+    Ok(json!(values[start..end].to_vec()).to_string())
 }
 
 pub async fn get_item_by_id(
@@ -169,4 +295,30 @@ pub async fn delete_item_by_id(
             "unknown error".to_string(),
         ))
     }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct Paginate {
+    #[serde(rename = "_page")]
+    pub page: usize,
+    #[serde(rename = "_size")]
+    pub size: usize,
+}
+
+#[derive(Deserialize)]
+pub struct Sort {
+    #[serde(rename = "_sort")]
+    pub sort: String,
+    #[serde(rename = "_order")]
+    pub order: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct Slice {
+    #[serde(rename = "_start")]
+    pub start: usize,
+    #[serde(rename = "_end")]
+    pub end: Option<usize>,
+    #[serde(rename = "_limit")]
+    pub limit: Option<usize>,
 }
