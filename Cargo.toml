@@ -1,0 +1,26 @@
+[package]
+name = "jserver"
+authors = ["JupiterGao <tj.gaojie@outlook.com>"]
+description = "A json api and static files server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = { version = "0.6.18" }
+chrono = { version = "0.4.26", features = ["serde"] }
+clap = { version = "4.3.10", features = ["derive"] }
+ctrlc = "3.4.0"
+env_logger = "0.10.0"
+log = "0.4.19"
+serde = { version = "1.0.164", features = ["derive"] }
+serde_json = "1.0.99"
+tokio = { version = "1.29.1", features = ["full"] }
+tower-http = { version = "0.4.1", features = ["full"] }
+
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"
