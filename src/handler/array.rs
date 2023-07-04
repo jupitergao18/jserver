@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use axum::{
     extract::{Path, Query, State},
     http::{StatusCode, Uri},
+    response::{IntoResponse, Response},
     Json,
 };
 use serde::Deserialize;
@@ -16,12 +17,15 @@ pub async fn list(
     sort: Option<Query<Sort>>,
     slice: Option<Query<Slice>>,
     State(app_state): State<AppState>,
-) -> Result<String, (StatusCode, String)> {
+) -> impl IntoResponse {
     let name = get_name(uri);
     let db_value = app_state.db_value.read().await;
     let values = db_value.get(&name).unwrap();
     if !values.is_array() {
-        return Err((StatusCode::BAD_REQUEST, "key is not array".to_string()));
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body::<String>("key is not array".into())
+            .unwrap();
     }
     let (sorts, orders) = if let Some(sort) = sort {
         let mut sorts = sort
@@ -35,10 +39,10 @@ pub async fn list(
             .map(|i| i.to_string())
             .collect::<Vec<String>>();
         if sorts.len() != orders.len() {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "sort and order length not match".to_string(),
-            ));
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body("sort and order length not match".into())
+                .unwrap();
         }
         sorts.reverse();
         orders.reverse();
@@ -48,43 +52,34 @@ pub async fn list(
     };
 
     if paginate.is_some() && slice.is_some() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "paginate and slice can not use together".to_string(),
-        ));
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body("paginate and slice can not use together".into())
+            .unwrap();
     }
 
     if let Some(slice) = slice.clone() {
         if slice.end.is_none() && slice.limit.is_none() {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "slice end and limit can not both be none".to_string(),
-            ));
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body("slice end and limit can not both be none".into())
+                .unwrap();
         }
         if let Some(end) = slice.end {
             if slice.start > end {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "slice start must less than end".to_string(),
-                ));
+                return Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body("slice start must less than end".into())
+                    .unwrap();
             }
         }
         if let Some(limit) = slice.limit {
             if limit == 0 {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "slice limit can not be zero".to_string(),
-                ));
+                return Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body("slice limit can not be zero".into())
+                    .unwrap();
             }
-        }
-    }
-
-    if let Some(paginate) = paginate.clone() {
-        if paginate.size == 0 {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "paginate size can not be zero".to_string(),
-            ));
         }
     }
 
@@ -121,8 +116,17 @@ pub async fn list(
     //3、page or slice
     let (start, end) = if let Some(paginate) = paginate {
         (
-            paginate.page * paginate.size,
-            paginate.page * paginate.size + paginate.size,
+            (if paginate.page > 0 {
+                paginate.page - 1
+            } else {
+                0
+            }) * paginate.size.unwrap_or(20),
+            (if paginate.page > 0 {
+                paginate.page - 1
+            } else {
+                0
+            }) * paginate.size.unwrap_or(20)
+                + paginate.size.unwrap_or(20),
         )
     } else if let Some(slice) = slice {
         if let Some(end) = slice.end {
@@ -134,14 +138,19 @@ pub async fn list(
         (0, 20)
     };
 
-    if start >= values.len() {
-        return Ok(json!(Vec::<Value>::new()).to_string());
-    }
-    if end > values.len() {
-        return Ok(json!(values[start..].to_vec()).to_string());
-    }
+    let body = if start >= values.len() {
+        json!(Vec::<Value>::new()).to_string()
+    } else if end > values.len() {
+        json!(values[start..].to_vec()).to_string()
+    } else {
+        json!(values[start..end].to_vec()).to_string()
+    };
 
-    Ok(json!(values[start..end].to_vec()).to_string())
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("X-Total-Count", values.len().to_string())
+        .body(body)
+        .unwrap()
 }
 
 pub async fn get_item_by_id(
@@ -302,7 +311,7 @@ pub struct Paginate {
     #[serde(rename = "_page")]
     pub page: usize,
     #[serde(rename = "_size")]
-    pub size: usize,
+    pub size: Option<usize>,
 }
 
 #[derive(Deserialize)]

@@ -74,6 +74,43 @@ PUT    /api/profile
 PATCH  /api/profile
 ```
 
+### Paginate
+
+Use `_page` and optionally `_size` to paginate returned data.
+
+```
+GET /posts?_page=7
+GET /posts?_page=7&_size=20
+```
+
+_20 items are returned by default, page is 1 based(0 is treated as 1)_
+
+### Sort
+
+Add `_sort` and `_order` (ascending order by default)
+
+```
+GET /posts?_sort=views&_order=asc
+GET /posts/1/comments?_sort=votes&_order=asc
+```
+
+For multiple fields, use the following format:
+
+```
+GET /posts?_sort=user,views&_order=desc,asc
+```
+
+### Slice
+
+Add `_start` and (`_end` or `_limit`)
+
+```
+GET /posts?_start=20&_end=30
+GET /posts?_start=20&_limit=10
+```
+
+An `X-Total-Count` header is included in the array response
+
 ### Database
 
 ```
