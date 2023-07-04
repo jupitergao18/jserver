@@ -4,7 +4,10 @@ use axum::{
     routing::{delete, get, patch, post, put},
     Router,
 };
-use tower_http::services::ServeDir;
+use tower_http::{
+    cors::{Any, CorsLayer},
+    services::ServeDir,
+};
 
 use crate::AppState;
 
@@ -45,6 +48,7 @@ pub async fn build_router(app_state: AppState, public_path: &str) -> Router {
         .route("/db", get(db))
         .nest("/api", api_routers)
         .fallback_service(ServeDir::new(public_path))
+        .layer(CorsLayer::new().allow_methods(Any).allow_origin(Any))
         .with_state(app_state.clone())
 }
 

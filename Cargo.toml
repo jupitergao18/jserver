@@ -2,13 +2,13 @@
 name = "jserver"
 authors = ["JupiterGao <tj.gaojie@outlook.com>"]
 description = "A json api and static files server"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = { version = "0.6.18" }
+axum = { version = "0.6.18", features = ["headers"] }
 chrono = { version = "0.4.26", features = ["serde"] }
 clap = { version = "4.3.10", features = ["derive"] }
 ctrlc = "3.4.0"
