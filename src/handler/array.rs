@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashMap};
 
 use axum::{
     extract::{Path, Query, State},
@@ -11,11 +11,14 @@ use serde_json::{json, Value};
 
 use super::{get_name, AppState};
 
+const DEFAULT_PAGE_SIZE: usize = 20;
+
 pub async fn list(
     uri: Uri,
     paginate: Option<Query<Paginate>>,
     sort: Option<Query<Sort>>,
     slice: Option<Query<Slice>>,
+    Query(params): Query<HashMap<String, String>>,
     State(app_state): State<AppState>,
 ) -> impl IntoResponse {
     let name = get_name(uri);
@@ -59,12 +62,6 @@ pub async fn list(
     }
 
     if let Some(slice) = slice.clone() {
-        if slice.end.is_none() && slice.limit.is_none() {
-            return Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body("slice end and limit can not both be none".into())
-                .unwrap();
-        }
         if let Some(end) = slice.end {
             if slice.start > end {
                 return Response::builder()
@@ -87,6 +84,85 @@ pub async fn list(
     let values = values_clone.as_array_mut().unwrap();
 
     //1、filter
+    let filters = params
+        .iter()
+        .filter(|(k, _)| !k.starts_with('_'))
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect::<Vec<(String, String)>>();
+    values.retain(|item| {
+        for (k, v) in filters.iter() {
+            if k.ends_with("_lte") {
+                let value = item.get(k.trim_end_matches("_lte")).unwrap();
+                if value.is_number() && value.as_f64().unwrap() > v.parse::<f64>().unwrap() {
+                    return false;
+                }
+            } else if k.ends_with("_gte") {
+                let value = item.get(k.trim_end_matches("_gte")).unwrap();
+                if value.is_number() && value.as_f64().unwrap() < v.parse::<f64>().unwrap() {
+                    return false;
+                }
+            } else if k.ends_with("_lt") {
+                let value = item.get(k.trim_end_matches("_lt")).unwrap();
+                if value.is_number() && value.as_f64().unwrap() >= v.parse::<f64>().unwrap() {
+                    return false;
+                }
+            } else if k.ends_with("_gt") {
+                let value = item.get(k.trim_end_matches("_gt")).unwrap();
+                if value.is_number() && value.as_f64().unwrap() <= v.parse::<f64>().unwrap() {
+                    return false;
+                }
+            } else if k.ends_with("_ne") {
+                let value = item.get(k.trim_end_matches("_ne")).unwrap();
+                if (value.is_string() && value.as_str().unwrap() == v)
+                    || (value.is_number() && value.as_f64().unwrap() == v.parse::<f64>().unwrap())
+                    || (value.is_boolean()
+                        && value.as_bool().unwrap() == v.parse::<bool>().unwrap())
+                {
+                    return false;
+                }
+            } else if k.ends_with("_like") {
+                let value = item.get(k.trim_end_matches("_like")).unwrap();
+                if !value.is_string() || !value.as_str().unwrap().contains(v) {
+                    return false;
+                }
+            } else if k.ends_with("_nlike") {
+                let value = item.get(k.trim_end_matches("_nlike")).unwrap();
+                if !value.is_string() || value.as_str().unwrap().contains(v) {
+                    return false;
+                }
+            } else if k.ends_with("_contains") {
+                let value = item.get(k.trim_end_matches("_contains")).unwrap();
+                if !value.is_array()
+                    || !value
+                        .as_array()
+                        .unwrap()
+                        .contains(&Value::String(v.to_string()))
+                {
+                    return false;
+                }
+            } else if k.ends_with("_ncontains") {
+                let value = item.get(k.trim_end_matches("_ncontains")).unwrap();
+                if !value.is_array()
+                    || value
+                        .as_array()
+                        .unwrap()
+                        .contains(&Value::String(v.to_string()))
+                {
+                    return false;
+                }
+            } else {
+                let value = item.get(k).unwrap();
+                if (value.is_string() && value.as_str().unwrap() != v)
+                    || (value.is_number() && value.as_f64().unwrap() != v.parse::<f64>().unwrap())
+                    || (value.is_boolean()
+                        && value.as_bool().unwrap() != v.parse::<bool>().unwrap())
+                {
+                    return false;
+                }
+            }
+        }
+        true
+    });
     //2、sort
     for (sort, order) in sorts.iter().zip(orders.iter()) {
         values.sort_by(|a, b| {
@@ -108,6 +184,14 @@ pub async fn list(
                 } else {
                     b.partial_cmp(a).unwrap()
                 }
+            } else if a.is_boolean() && b.is_boolean() {
+                let a = a.as_bool().unwrap();
+                let b = b.as_bool().unwrap();
+                if order == "asc" {
+                    a.cmp(&b)
+                } else {
+                    b.cmp(&a)
+                }
             } else {
                 Ordering::Equal
             }
@@ -120,22 +204,25 @@ pub async fn list(
                 paginate.page - 1
             } else {
                 0
-            }) * paginate.size.unwrap_or(20),
+            }) * paginate.size.unwrap_or(DEFAULT_PAGE_SIZE),
             (if paginate.page > 0 {
                 paginate.page - 1
             } else {
                 0
-            }) * paginate.size.unwrap_or(20)
-                + paginate.size.unwrap_or(20),
+            }) * paginate.size.unwrap_or(DEFAULT_PAGE_SIZE)
+                + paginate.size.unwrap_or(DEFAULT_PAGE_SIZE),
         )
     } else if let Some(slice) = slice {
         if let Some(end) = slice.end {
             (slice.start, end)
         } else {
-            (slice.start, slice.start + slice.limit.unwrap())
+            (
+                slice.start,
+                slice.start + slice.limit.unwrap_or(DEFAULT_PAGE_SIZE),
+            )
         }
     } else {
-        (0, 20)
+        (0, DEFAULT_PAGE_SIZE)
     };
 
     let body = if start >= values.len() {

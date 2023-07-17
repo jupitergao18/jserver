@@ -74,6 +74,27 @@ PUT    /api/profile
 PATCH  /api/profile
 ```
 
+### Filter
+
+```
+GET    /api/posts?title=jserver
+GET    /api/posts?id=1
+```
+
+### Operators
+
+For numbers, use the following suffix: `_lt`, `_lte`, `_gt`, `_gte` for `<`, `<=`, `>`, `>=` respectively. 
+For strings, use `_like` for `contains` and `_nlike` for `not contains`. 
+For arrays, use `_contains` for `contains` and `_ncontains` for `not contains`. 
+For numbers, strings, booleans, use `_ne` for `!=`. 
+
+```
+
+```
+GET    /api/posts?title_like=server
+GET    /api/posts?id_gt=1&id_lt=3
+```
+
 ### Paginate
 
 Use `_page` and optionally `_size` to paginate returned data.
