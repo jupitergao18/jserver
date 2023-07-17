@@ -1,3 +1,5 @@
+[README_CN.md](中文版说明)
+
 # jserver
 A json api and static files server in rust
 
