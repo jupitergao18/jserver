@@ -1,3 +1,5 @@
+[中文版说明](README_CN.md)
+
 # jserver
 A json api and static files server in rust
 
@@ -24,7 +26,7 @@ Create a `data.json` file with some data
     { "id": 1, "title": "jserver", "author": "jupiter.gao" }
   ],
   "comments": [
-    { "id": 1, "body": "some comment", "postId": 1 }
+    { "id": 1, "body": "some comment" }
   ],
   "profile": { "name": "jupiter" },
   "homepage": "https://apicenter.com.cn"
@@ -74,13 +76,33 @@ PUT    /api/profile
 PATCH  /api/profile
 ```
 
+### Filter
+
+```
+GET    /api/posts?title=jserver
+GET    /api/posts?id=1
+```
+
+### Operators
+
+For numbers, use the following suffix: `_lt`, `_lte`, `_gt`, `_gte` for `<`, `<=`, `>`, `>=` respectively. 
+For strings, use `_like` for `contains` and `_nlike` for `not contains`. 
+For arrays, use `_contains` for `contains` and `_ncontains` for `not contains`. 
+For numbers, strings, booleans, use `_ne` for `!=`. 
+
+
+```
+GET    /api/posts?title_like=server
+GET    /api/posts?id_gt=1&id_lt=3
+```
+
 ### Paginate
 
 Use `_page` and optionally `_size` to paginate returned data.
 
 ```
-GET /posts?_page=7
-GET /posts?_page=7&_size=20
+GET /api/posts?_page=7
+GET /api/posts?_page=7&_size=20
 ```
 
 _20 items are returned by default, page is 1 based(0 is treated as 1)_
@@ -90,14 +112,13 @@ _20 items are returned by default, page is 1 based(0 is treated as 1)_
 Add `_sort` and `_order` (ascending order by default)
 
 ```
-GET /posts?_sort=views&_order=asc
-GET /posts?_sort=votes&_order=asc
+GET /api/posts?_sort=views&_order=asc
 ```
 
 For multiple fields, use the following format:
 
 ```
-GET /posts?_sort=user,views&_order=desc,asc
+GET /api/posts?_sort=user,views&_order=desc,asc
 ```
 
 ### Slice
@@ -105,8 +126,8 @@ GET /posts?_sort=user,views&_order=desc,asc
 Add `_start` and (`_end` or `_limit`)
 
 ```
-GET /posts?_start=20&_end=30
-GET /posts?_start=20&_limit=10
+GET /api/posts?_start=20&_end=30
+GET /api/posts?_start=20&_limit=10
 ```
 
 An `X-Total-Count` header is included in the array response
