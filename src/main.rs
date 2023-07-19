@@ -172,13 +172,20 @@ async fn save(app_state: AppState, db_path: &str) {
     let db_value = app_state.db_value.read().await;
     let db_content = serde_json::to_string(&*db_value).expect("Error serializing database file");
     drop(db_value);
-    let mut db_file = tokio::fs::File::create(db_path)
+    let temp_file = format!("{}.tmp", db_path);
+    let mut db_file = tokio::fs::File::create(&temp_file)
         .await
         .expect("Error creating database file");
     db_file
         .write_all(db_content.as_bytes())
         .await
         .expect("Error writing database file");
+    tokio::fs::remove_file(db_path)
+        .await
+        .expect("Error removing old database file");
+    tokio::fs::rename(&temp_file, db_path)
+        .await
+        .expect("Error renaming database file");
     log::info!("Database file saved");
 }
 
