@@ -2,7 +2,6 @@ use axum::{
     extract::{Multipart, State},
     http::StatusCode,
 };
-use futures_util::StreamExt;
 use serde::Serialize;
 use tokio::io::AsyncWriteExt;
 
@@ -33,26 +32,21 @@ pub async fn upload(
                     .unwrap_or(uuid.clone().as_str())
                     .to_string();
                 let ext_name = name.split('.').last().unwrap_or("").to_string();
-                log::debug!(
-                    "found file [{}.{}] = [{}]",
-                    uuid.clone(),
-                    ext_name.clone(),
-                    name.clone()
-                );
+                log::debug!("found file [{}.{}] = [{}]", uuid, ext_name, name);
 
                 if let Ok(mut file) =
                     tokio::fs::File::create(format!("{}/{}.{}", public_path, uuid, ext_name)).await
                 {
                     let mut size = 0usize;
-                    while let Some(next) = field.next().await {
-                        if let Ok(chunk) = next {
+                    while let Ok(chunk) = field.chunk().await {
+                        if let Some(chunk) = chunk {
                             match file.write_all(&chunk).await {
                                 Ok(_) => {
                                     log::debug!(
                                         "upload file [{}.{}] = [{}] ( {} bytes)",
-                                        uuid.clone(),
-                                        ext_name.clone(),
-                                        name.clone(),
+                                        uuid,
+                                        ext_name,
+                                        name,
                                         chunk.len()
                                     );
                                     size += chunk.len();
@@ -69,7 +63,7 @@ pub async fn upload(
                         }
                     }
                     result.push(FileInfo {
-                        name: name.clone(),
+                        name,
                         path: format!("/{}.{}", uuid, ext_name),
                         size,
                     });
