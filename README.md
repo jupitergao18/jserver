@@ -138,6 +138,17 @@ An `X-Total-Count` header is included in the array response
 GET /db
 ```
 
+### Upload files
+
+You can upload files to the server and access them through the static file server below.
+
+```
+POST /upload
+```
+
+Request body should be `multipart/form-data` and file field name should be `file`.
+Response body will be a JSON array with each item having `name`, `path` and `size` properties.
+
 ### Static file server
 
 You can use JSON Server to serve your HTML, JS and CSS, simply create a `./public` directory

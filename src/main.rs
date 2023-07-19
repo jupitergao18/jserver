@@ -43,8 +43,12 @@ async fn main() {
         Err(e) => match e.kind() {
             std::io::ErrorKind::NotFound => {
                 log::warn!("Database file not found, creating...");
-                let mut file = tokio::fs::File::create(&args.db_path).await.unwrap();
-                file.write_all(b"{}").await.unwrap();
+                let mut file = tokio::fs::File::create(&args.db_path)
+                    .await
+                    .expect("Error creating database file");
+                file.write_all(b"{}")
+                    .await
+                    .expect("Error writing database file");
                 file
             }
             _ => {
@@ -76,19 +80,32 @@ async fn main() {
     };
     drop(db_content);
 
+    if let Err(e) = tokio::fs::create_dir_all(&args.public_path).await {
+        log::error!("Error creating public path: {}", e);
+        panic!()
+    }
+
     let app_state = AppState {
         db_value: Arc::new(RwLock::new(db_value)),
         dirty: Arc::new(RwLock::new(false)),
         id: args.id.to_string(),
+        public_path: args.public_path.clone(),
     };
 
     let (server_tx, server_rx) = std::sync::mpsc::channel::<bool>();
 
     let app_state_for_server = app_state.clone();
     let server_tack = tokio::spawn(async move {
-        match axum::Server::try_bind(&args.bind_address.parse().unwrap()) {
+        match axum::Server::try_bind(
+            &args
+                .bind_address
+                .parse()
+                .expect("Error parsing bind_address"),
+        ) {
             Ok(server) => {
-                server_tx.send(true).unwrap();
+                server_tx
+                    .send(true)
+                    .expect("Error sending server start success signal");
                 match server
                     .serve(
                         handler::build_router(app_state_for_server, &args.public_path)
@@ -103,7 +120,9 @@ async fn main() {
             }
             Err(e) => {
                 log::error!("Error binding server: {}", e);
-                server_tx.send(false).unwrap();
+                server_tx
+                    .send(false)
+                    .expect("Error sending server start fail signal");
             }
         }
     });
@@ -133,7 +152,7 @@ async fn main() {
     ctrlc::set_handler(move || {
         cctx.send(()).expect("Error sending CTRL+C signal");
     })
-    .unwrap();
+    .expect("Error setting CTRL+C handler");
 
     ccrx.recv().expect("Could not receive from channel.");
 
@@ -151,10 +170,15 @@ async fn main() {
 async fn save(app_state: AppState, db_path: &str) {
     log::info!("Database file saving...");
     let db_value = app_state.db_value.read().await;
-    let db_content = serde_json::to_string(&*db_value).unwrap();
+    let db_content = serde_json::to_string(&*db_value).expect("Error serializing database file");
     drop(db_value);
-    let mut db_file = tokio::fs::File::create(db_path).await.unwrap();
-    db_file.write_all(db_content.as_bytes()).await.unwrap();
+    let mut db_file = tokio::fs::File::create(db_path)
+        .await
+        .expect("Error creating database file");
+    db_file
+        .write_all(db_content.as_bytes())
+        .await
+        .expect("Error writing database file");
     log::info!("Database file saved");
 }
 
@@ -178,4 +202,5 @@ pub struct AppState {
     db_value: Arc<RwLock<Value>>,
     id: String,
     dirty: Arc<RwLock<bool>>,
+    public_path: String,
 }

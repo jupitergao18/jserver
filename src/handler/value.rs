@@ -28,7 +28,7 @@ pub async fn update_value(
     if value.is_array() || value.is_null() {
         return Err((
             StatusCode::BAD_REQUEST,
-            "value must be object or plain value, not null".to_string(),
+            "value must be object or plain value, not array nor null".to_string(),
         ));
     }
     if let Some(db_value) = app_state.db_value.write().await.as_object_mut() {

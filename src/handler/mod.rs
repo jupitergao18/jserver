@@ -1,24 +1,26 @@
 use axum::{
-    extract::State,
+    extract::{DefaultBodyLimit, State},
     http::Uri,
     routing::{delete, get, patch, post, put},
     Router,
 };
 use tower_http::{
     cors::{Any, CorsLayer},
+    limit::RequestBodyLimitLayer,
     services::ServeDir,
 };
 
 use crate::AppState;
 
 mod array;
+mod upload;
 mod value;
 
 pub async fn build_router(app_state: AppState, public_path: &str) -> Router {
     let mut api_routers = Router::new();
     let db_value = app_state.db_value.read().await;
     let id = &app_state.id;
-    for (key, value) in db_value.as_object().unwrap().iter() {
+    for (key, value) in db_value.as_object().expect("Invalid json object").iter() {
         if value.is_array() {
             let value_id_check = value.as_array().unwrap().iter().all(|item| {
                 item.is_object() && item.get(id).is_some() && item.get(id).unwrap().is_u64()
@@ -46,9 +48,17 @@ pub async fn build_router(app_state: AppState, public_path: &str) -> Router {
 
     Router::new()
         .route("/db", get(db))
+        .route("/upload", post(upload::upload))
         .nest("/api", api_routers)
         .fallback_service(ServeDir::new(public_path))
-        .layer(CorsLayer::new().allow_methods(Any).allow_origin(Any))
+        .layer(
+            CorsLayer::new()
+                .allow_methods(Any)
+                .allow_origin(Any)
+                .allow_headers(Any),
+        )
+        .layer(DefaultBodyLimit::disable())
+        .layer(RequestBodyLimitLayer::new(100 * 1024 * 1024))
         .with_state(app_state.clone())
 }
 
