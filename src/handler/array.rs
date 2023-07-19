@@ -258,6 +258,7 @@ pub async fn list(
     Response::builder()
         .status(StatusCode::OK)
         .header("X-Total-Count", values.len().to_string())
+        .header("Content-Type", "application/json")
         .body(body)
         .expect("failed to render response")
 }
@@ -266,7 +267,7 @@ pub async fn get_item_by_id(
     uri: Uri,
     Path(id): Path<u64>,
     State(app_state): State<AppState>,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     let name = get_name(uri);
     match app_state
         .db_value
@@ -279,7 +280,7 @@ pub async fn get_item_by_id(
         .iter()
         .find(|item| item[&app_state.id] == id)
     {
-        Some(item) => Ok(item.to_string()),
+        Some(item) => Ok(item.clone().into()),
         None => Err((StatusCode::NOT_FOUND, "not found".to_string())),
     }
 }
@@ -288,7 +289,7 @@ pub async fn post_item(
     uri: Uri,
     State(app_state): State<AppState>,
     Json(value): Json<Value>,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     let name = get_name(uri);
     if !value.is_object() {
         return Err((StatusCode::BAD_REQUEST, "value is not object".to_string()));
@@ -336,7 +337,7 @@ pub async fn post_item(
         old_value.as_array_mut().unwrap().push(value.clone());
         *dirty = true;
         drop(dirty);
-        Ok(value.to_string())
+        Ok(value.into())
     } else {
         Err((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -350,7 +351,7 @@ pub async fn update_item_by_id(
     Path(id): Path<u64>,
     State(app_state): State<AppState>,
     Json(value): Json<Value>,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     let name = get_name(uri);
     if !value.is_object() {
         return Err((StatusCode::BAD_REQUEST, "value is not object".to_string()));
@@ -372,7 +373,7 @@ pub async fn update_item_by_id(
                 drop(dirty);
             }
         }
-        Ok(value_clone.to_string())
+        Ok(value_clone.into())
     } else {
         Err((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -385,7 +386,7 @@ pub async fn delete_item_by_id(
     uri: Uri,
     Path(id): Path<u64>,
     State(app_state): State<AppState>,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     let name = get_name(uri);
     if let Some(db_value) = app_state.db_value.write().await.as_object_mut() {
         let old_value = db_value.get_mut(&name).unwrap();
@@ -403,7 +404,7 @@ pub async fn delete_item_by_id(
                 let value = old_value.as_array_mut().unwrap().remove(index);
                 *dirty = true;
                 drop(dirty);
-                Ok(value.to_string())
+                Ok(value.into())
             }
             None => Err((StatusCode::NOT_FOUND, "not found".to_string())),
         }

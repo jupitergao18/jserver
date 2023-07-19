@@ -2,8 +2,9 @@ use axum::{
     extract::{DefaultBodyLimit, State},
     http::Uri,
     routing::{delete, get, patch, post, put},
-    Router,
+    Json, Router,
 };
+use serde_json::Value;
 use tower_http::{
     cors::{Any, CorsLayer},
     limit::RequestBodyLimitLayer,
@@ -62,9 +63,9 @@ pub async fn build_router(app_state: AppState, public_path: &str) -> Router {
         .with_state(app_state.clone())
 }
 
-async fn db(State(app_state): State<AppState>) -> String {
+async fn db(State(app_state): State<AppState>) -> Json<Value> {
     let db_value = app_state.db_value.read().await;
-    db_value.to_string()
+    db_value.clone().into()
 }
 
 pub fn get_name(uri: Uri) -> String {

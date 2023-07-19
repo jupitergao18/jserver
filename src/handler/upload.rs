@@ -1,6 +1,7 @@
 use axum::{
     extract::{Multipart, State},
     http::StatusCode,
+    Json,
 };
 use serde::Serialize;
 use tokio::io::AsyncWriteExt;
@@ -8,7 +9,7 @@ use tokio::io::AsyncWriteExt;
 use crate::AppState;
 
 #[derive(Debug, Serialize, Clone)]
-struct FileInfo {
+pub struct FileInfo {
     pub name: String,
     pub path: String,
     pub size: usize,
@@ -17,7 +18,7 @@ struct FileInfo {
 pub async fn upload(
     State(app_state): State<AppState>,
     mut multipart: Multipart,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<Vec<FileInfo>>, (StatusCode, String)> {
     let public_path = &app_state.public_path;
     let mut result = Vec::<FileInfo>::new();
     while let Ok(opt_field) = multipart.next_field().await {
@@ -78,12 +79,5 @@ pub async fn upload(
             break;
         }
     }
-    if let Ok(json) = serde_json::to_string(&result) {
-        Ok(json)
-    } else {
-        Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "json encode error".to_string(),
-        ))
-    }
+    Ok(result.into())
 }

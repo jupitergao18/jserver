@@ -139,7 +139,7 @@ async fn main() {
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             let mut dirty = app_state_for_save.dirty.write().await;
             if !*dirty {
-                log::debug!("Database file saving... skipped");
+                log::trace!("Database file saving... skipped");
                 continue;
             }
             save(app_state_for_save.clone(), &db_path).await;

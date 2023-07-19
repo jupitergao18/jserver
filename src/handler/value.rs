@@ -8,7 +8,7 @@ use crate::handler::get_name;
 
 use super::AppState;
 
-pub async fn get_value(uri: Uri, State(app_state): State<AppState>) -> String {
+pub async fn get_value(uri: Uri, State(app_state): State<AppState>) -> Json<Value> {
     let name = get_name(uri);
     app_state
         .db_value
@@ -16,14 +16,15 @@ pub async fn get_value(uri: Uri, State(app_state): State<AppState>) -> String {
         .await
         .get(&name)
         .unwrap()
-        .to_string()
+        .clone()
+        .into()
 }
 
 pub async fn update_value(
     uri: Uri,
     State(app_state): State<AppState>,
     Json(value): Json<Value>,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     let name = get_name(uri);
     if value.is_array() || value.is_null() {
         return Err((
@@ -45,7 +46,7 @@ pub async fn update_value(
         db_value.insert(name, value.clone());
         *dirty = true;
         drop(dirty);
-        Ok(value.to_string())
+        Ok(value.into())
     } else {
         Err((
             StatusCode::INTERNAL_SERVER_ERROR,
