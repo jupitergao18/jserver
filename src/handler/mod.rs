@@ -1,24 +1,27 @@
 use axum::{
-    extract::State,
+    extract::{DefaultBodyLimit, State},
     http::Uri,
     routing::{delete, get, patch, post, put},
-    Router,
+    Json, Router,
 };
+use serde_json::Value;
 use tower_http::{
     cors::{Any, CorsLayer},
+    limit::RequestBodyLimitLayer,
     services::ServeDir,
 };
 
-use crate::AppState;
+use crate::{AppState, Args};
 
 mod array;
+mod upload;
 mod value;
 
-pub async fn build_router(app_state: AppState, public_path: &str) -> Router {
+pub async fn build_router(app_state: AppState, args: Args) -> Router {
     let mut api_routers = Router::new();
     let db_value = app_state.db_value.read().await;
     let id = &app_state.id;
-    for (key, value) in db_value.as_object().unwrap().iter() {
+    for (key, value) in db_value.as_object().expect("Invalid json object").iter() {
         if value.is_array() {
             let value_id_check = value.as_array().unwrap().iter().all(|item| {
                 item.is_object() && item.get(id).is_some() && item.get(id).unwrap().is_u64()
@@ -46,15 +49,25 @@ pub async fn build_router(app_state: AppState, public_path: &str) -> Router {
 
     Router::new()
         .route("/db", get(db))
+        .route("/upload", post(upload::upload))
         .nest("/api", api_routers)
-        .fallback_service(ServeDir::new(public_path))
-        .layer(CorsLayer::new().allow_methods(Any).allow_origin(Any))
+        .fallback_service(ServeDir::new(args.public_path))
+        .layer(
+            CorsLayer::new()
+                .allow_methods(Any)
+                .allow_origin(Any)
+                .allow_headers(Any),
+        )
+        .layer(DefaultBodyLimit::disable())
+        .layer(RequestBodyLimitLayer::new(
+            args.max_body_limit_m * 1024 * 1024,
+        ))
         .with_state(app_state.clone())
 }
 
-async fn db(State(app_state): State<AppState>) -> String {
+async fn db(State(app_state): State<AppState>) -> Json<Value> {
     let db_value = app_state.db_value.read().await;
-    db_value.to_string()
+    db_value.clone().into()
 }
 
 pub fn get_name(uri: Uri) -> String {

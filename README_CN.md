@@ -137,6 +137,17 @@ GET /api/posts?_start=20&_limit=10
 GET /db
 ```
 
+### 上传文件
+
+服务器支持上传文件，并可通过下面介绍的静态文件服务器访问。
+
+```
+POST /upload
+```
+
+请求体为 `multipart/form-data` 格式，文件字段名为 `file`。
+响应体为 json 数组，元素包含 `name`, `path` 和 `size` 字段。
+
 ### 静态文件服务器
 
 你可以使用 JServer 提供静态文件服务，如 HTML, JS 和 CSS 文件，只需将文件放在 `./public` 目录即可
@@ -158,13 +169,14 @@ jserver --public-path ./some-other-dir
 用法: jserver [选项]
 
 选项:
-  -b, --bind-address <服务绑定地址>  [default: 0.0.0.0:2901]
-  -d, --db-path <数据json文件>       [default: ./data.json]
-  -p, --public-path <静态文件路径>   [default: ./public]
-  -i, --id <用作唯一标识的字段名>    [default: id]
+  -b, --bind-address <服务绑定地址>       [default: 0.0.0.0:2901]
+  -d, --db-path <数据json文件>            [default: ./data.json]
+  -p, --public-path <静态文件路径>        [default: ./public]
+  -i, --id <用作唯一标识的字段名>         [default: id]
+  -m, --max-body-limit-m <最大请求限制M>  [default: 100]
       --debug
-  -h, --help                         显示帮助信息
-  -V, --version                      显示版本号
+  -h, --help                              显示帮助信息
+  -V, --version                           显示版本号
 ```
 
 ## 许可证

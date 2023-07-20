@@ -23,12 +23,12 @@ pub async fn list(
 ) -> impl IntoResponse {
     let name = get_name(uri);
     let db_value = app_state.db_value.read().await;
-    let values = db_value.get(&name).unwrap();
+    let values = db_value.get(&name).expect("key not found");
     if !values.is_array() {
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body::<String>("key is not array".into())
-            .unwrap();
+            .expect("failed to render response");
     }
     let (sorts, orders) = if let Some(sort) = sort {
         let mut sorts = sort
@@ -45,7 +45,7 @@ pub async fn list(
             return Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .body("sort and order length not match".into())
-                .unwrap();
+                .expect("failed to render response");
         }
         sorts.reverse();
         orders.reverse();
@@ -58,7 +58,7 @@ pub async fn list(
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body("paginate and slice can not use together".into())
-            .unwrap();
+            .expect("failed to render response");
     }
 
     if let Some(slice) = slice.clone() {
@@ -67,7 +67,7 @@ pub async fn list(
                 return Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .body("slice start must less than end".into())
-                    .unwrap();
+                    .expect("failed to render response");
             }
         }
         if let Some(limit) = slice.limit {
@@ -75,7 +75,7 @@ pub async fn list(
                 return Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .body("slice limit can not be zero".into())
-                    .unwrap();
+                    .expect("failed to render response");
             }
         }
     }
@@ -91,22 +91,22 @@ pub async fn list(
         .collect::<Vec<(String, String)>>();
     values.retain(|item| {
         for (k, v) in filters.iter() {
-            if k.ends_with("_lte") {
+            if k.ends_with("_lte") && v.parse::<f64>().is_ok() {
                 let value = item.get(k.trim_end_matches("_lte")).unwrap();
                 if value.is_number() && value.as_f64().unwrap() > v.parse::<f64>().unwrap() {
                     return false;
                 }
-            } else if k.ends_with("_gte") {
+            } else if k.ends_with("_gte") && v.parse::<f64>().is_ok() {
                 let value = item.get(k.trim_end_matches("_gte")).unwrap();
                 if value.is_number() && value.as_f64().unwrap() < v.parse::<f64>().unwrap() {
                     return false;
                 }
-            } else if k.ends_with("_lt") {
+            } else if k.ends_with("_lt") && v.parse::<f64>().is_ok() {
                 let value = item.get(k.trim_end_matches("_lt")).unwrap();
                 if value.is_number() && value.as_f64().unwrap() >= v.parse::<f64>().unwrap() {
                     return false;
                 }
-            } else if k.ends_with("_gt") {
+            } else if k.ends_with("_gt") && v.parse::<f64>().is_ok() {
                 let value = item.get(k.trim_end_matches("_gt")).unwrap();
                 if value.is_number() && value.as_f64().unwrap() <= v.parse::<f64>().unwrap() {
                     return false;
@@ -114,7 +114,9 @@ pub async fn list(
             } else if k.ends_with("_ne") {
                 let value = item.get(k.trim_end_matches("_ne")).unwrap();
                 if (value.is_string() && value.as_str().unwrap() == v)
-                    || (value.is_number() && value.as_f64().unwrap() == v.parse::<f64>().unwrap())
+                    || (value.is_number()
+                        && v.parse::<f64>().is_ok()
+                        && value.as_f64().unwrap() == v.parse::<f64>().unwrap())
                     || (value.is_boolean()
                         && value.as_bool().unwrap() == v.parse::<bool>().unwrap())
                 {
@@ -153,8 +155,11 @@ pub async fn list(
             } else {
                 let value = item.get(k).unwrap();
                 if (value.is_string() && value.as_str().unwrap() != v)
-                    || (value.is_number() && value.as_f64().unwrap() != v.parse::<f64>().unwrap())
+                    || (value.is_number()
+                        && v.parse::<f64>().is_ok()
+                        && value.as_f64().unwrap() != v.parse::<f64>().unwrap())
                     || (value.is_boolean()
+                        && v.parse::<bool>().is_ok()
                         && value.as_bool().unwrap() != v.parse::<bool>().unwrap())
                 {
                     return false;
@@ -166,8 +171,25 @@ pub async fn list(
     //2、sort
     for (sort, order) in sorts.iter().zip(orders.iter()) {
         values.sort_by(|a, b| {
-            let a = a.get(sort).unwrap();
-            let b = b.get(sort).unwrap();
+            let a = a.get(sort);
+            let b = b.get(sort);
+            if a.is_none() && b.is_none() {
+                return Ordering::Equal;
+            } else if a.is_none() && b.is_some() {
+                if order == "asc" {
+                    return Ordering::Less;
+                } else {
+                    return Ordering::Greater;
+                }
+            } else if a.is_some() && b.is_none() {
+                if order == "asc" {
+                    return Ordering::Greater;
+                } else {
+                    return Ordering::Less;
+                }
+            }
+            let a = a.unwrap();
+            let b = b.unwrap();
             if a.is_number() && b.is_number() {
                 let a = a.as_f64().unwrap();
                 let b = b.as_f64().unwrap();
@@ -236,15 +258,16 @@ pub async fn list(
     Response::builder()
         .status(StatusCode::OK)
         .header("X-Total-Count", values.len().to_string())
+        .header("Content-Type", "application/json")
         .body(body)
-        .unwrap()
+        .expect("failed to render response")
 }
 
 pub async fn get_item_by_id(
     uri: Uri,
     Path(id): Path<u64>,
     State(app_state): State<AppState>,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     let name = get_name(uri);
     match app_state
         .db_value
@@ -257,7 +280,7 @@ pub async fn get_item_by_id(
         .iter()
         .find(|item| item[&app_state.id] == id)
     {
-        Some(item) => Ok(item.to_string()),
+        Some(item) => Ok(item.clone().into()),
         None => Err((StatusCode::NOT_FOUND, "not found".to_string())),
     }
 }
@@ -266,13 +289,13 @@ pub async fn post_item(
     uri: Uri,
     State(app_state): State<AppState>,
     Json(value): Json<Value>,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     let name = get_name(uri);
     if !value.is_object() {
         return Err((StatusCode::BAD_REQUEST, "value is not object".to_string()));
     }
     if let Some(id_value) = value.get(&app_state.id) {
-        if !id_value.is_number() {
+        if !id_value.is_number() || id_value.as_u64().is_none() {
             return Err((
                 StatusCode::BAD_REQUEST,
                 "id must be an unsigned integer".to_string(),
@@ -303,7 +326,7 @@ pub async fn post_item(
                     .iter()
                     .map(|item| item.get(&app_state.id).unwrap().as_u64().unwrap())
                     .reduce(u64::max)
-                    .unwrap();
+                    .unwrap_or(0);
                 let mut value_clone = value.clone();
                 let value_with_id = value_clone.as_object_mut().unwrap();
                 value_with_id.insert(app_state.id.clone(), (max_id + 1).into());
@@ -314,7 +337,7 @@ pub async fn post_item(
         old_value.as_array_mut().unwrap().push(value.clone());
         *dirty = true;
         drop(dirty);
-        Ok(value.to_string())
+        Ok(value.into())
     } else {
         Err((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -328,7 +351,7 @@ pub async fn update_item_by_id(
     Path(id): Path<u64>,
     State(app_state): State<AppState>,
     Json(value): Json<Value>,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     let name = get_name(uri);
     if !value.is_object() {
         return Err((StatusCode::BAD_REQUEST, "value is not object".to_string()));
@@ -350,7 +373,7 @@ pub async fn update_item_by_id(
                 drop(dirty);
             }
         }
-        Ok(value_clone.to_string())
+        Ok(value_clone.into())
     } else {
         Err((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -363,7 +386,7 @@ pub async fn delete_item_by_id(
     uri: Uri,
     Path(id): Path<u64>,
     State(app_state): State<AppState>,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     let name = get_name(uri);
     if let Some(db_value) = app_state.db_value.write().await.as_object_mut() {
         let old_value = db_value.get_mut(&name).unwrap();
@@ -381,7 +404,7 @@ pub async fn delete_item_by_id(
                 let value = old_value.as_array_mut().unwrap().remove(index);
                 *dirty = true;
                 drop(dirty);
-                Ok(value.to_string())
+                Ok(value.into())
             }
             None => Err((StatusCode::NOT_FOUND, "not found".to_string())),
         }
