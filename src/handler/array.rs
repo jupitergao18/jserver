@@ -326,7 +326,7 @@ pub async fn post_item(
                     .iter()
                     .map(|item| item.get(&app_state.id).unwrap().as_u64().unwrap())
                     .reduce(u64::max)
-                    .unwrap_or(1);
+                    .unwrap_or(0);
                 let mut value_clone = value.clone();
                 let value_with_id = value_clone.as_object_mut().unwrap();
                 value_with_id.insert(app_state.id.clone(), (max_id + 1).into());
