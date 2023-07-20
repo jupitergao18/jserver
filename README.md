@@ -170,13 +170,14 @@ jserver --public-path ./some-other-dir
 Usage: jserver [OPTIONS]
 
 Options:
-  -b, --bind-address <BIND_ADDRESS>  [default: 0.0.0.0:2901]
-  -d, --db-path <DB_PATH>            [default: ./data.json]
-  -p, --public-path <PUBLIC_PATH>    [default: ./public]
-  -i, --id <ID>                      [default: id]
+  -b, --bind-address <BIND_ADDRESS>          [default: 0.0.0.0:2901]
+  -d, --db-path <DB_PATH>                    [default: ./data.json]
+  -p, --public-path <PUBLIC_PATH>            [default: ./public]
+  -i, --id <ID>                              [default: id]
+  -m, --max-body-limit-m <MAX_BODY_LIMIT_M>  [default: 100]
       --debug
-  -h, --help                         Print help
-  -V, --version                      Print version
+  -h, --help                                 Print help
+  -V, --version                              Print version
 ```
 
 ## License

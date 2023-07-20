@@ -95,6 +95,7 @@ async fn main() {
     let (server_tx, server_rx) = std::sync::mpsc::channel::<bool>();
 
     let app_state_for_server = app_state.clone();
+    let args_for_server = args.clone();
     let server_tack = tokio::spawn(async move {
         match axum::Server::try_bind(
             &args
@@ -108,7 +109,7 @@ async fn main() {
                     .expect("Error sending server start success signal");
                 match server
                     .serve(
-                        handler::build_router(app_state_for_server, &args.public_path)
+                        handler::build_router(app_state_for_server, args_for_server)
                             .await
                             .into_make_service(),
                     )
@@ -189,7 +190,7 @@ async fn save(app_state: AppState, db_path: &str) {
     log::info!("Database file saved");
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(version, about, long_about = None)]
 pub struct Args {
     #[arg(short, long, default_value = "0.0.0.0:2901")]
@@ -200,6 +201,8 @@ pub struct Args {
     public_path: String,
     #[arg(short, long, default_value = "id")]
     id: String,
+    #[arg(short, long, default_value = "100")]
+    max_body_limit_m: usize,
     #[arg(long, default_value_t = false)]
     debug: bool,
 }

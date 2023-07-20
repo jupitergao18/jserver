@@ -169,13 +169,14 @@ jserver --public-path ./some-other-dir
 用法: jserver [选项]
 
 选项:
-  -b, --bind-address <服务绑定地址>  [default: 0.0.0.0:2901]
-  -d, --db-path <数据json文件>       [default: ./data.json]
-  -p, --public-path <静态文件路径>   [default: ./public]
-  -i, --id <用作唯一标识的字段名>    [default: id]
+  -b, --bind-address <服务绑定地址>       [default: 0.0.0.0:2901]
+  -d, --db-path <数据json文件>            [default: ./data.json]
+  -p, --public-path <静态文件路径>        [default: ./public]
+  -i, --id <用作唯一标识的字段名>         [default: id]
+  -m, --max-body-limit-m <最大请求限制M>  [default: 100]
       --debug
-  -h, --help                         显示帮助信息
-  -V, --version                      显示版本号
+  -h, --help                              显示帮助信息
+  -V, --version                           显示版本号
 ```
 
 ## 许可证

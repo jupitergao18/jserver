@@ -11,13 +11,13 @@ use tower_http::{
     services::ServeDir,
 };
 
-use crate::AppState;
+use crate::{AppState, Args};
 
 mod array;
 mod upload;
 mod value;
 
-pub async fn build_router(app_state: AppState, public_path: &str) -> Router {
+pub async fn build_router(app_state: AppState, args: Args) -> Router {
     let mut api_routers = Router::new();
     let db_value = app_state.db_value.read().await;
     let id = &app_state.id;
@@ -51,7 +51,7 @@ pub async fn build_router(app_state: AppState, public_path: &str) -> Router {
         .route("/db", get(db))
         .route("/upload", post(upload::upload))
         .nest("/api", api_routers)
-        .fallback_service(ServeDir::new(public_path))
+        .fallback_service(ServeDir::new(args.public_path))
         .layer(
             CorsLayer::new()
                 .allow_methods(Any)
@@ -59,7 +59,9 @@ pub async fn build_router(app_state: AppState, public_path: &str) -> Router {
                 .allow_headers(Any),
         )
         .layer(DefaultBodyLimit::disable())
-        .layer(RequestBodyLimitLayer::new(100 * 1024 * 1024))
+        .layer(RequestBodyLimitLayer::new(
+            args.max_body_limit_m * 1024 * 1024,
+        ))
         .with_state(app_state.clone())
 }
 
