@@ -6,6 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use rayon::prelude::*;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -85,75 +86,120 @@ pub async fn list(
 
     //1、filter
     let filters = params
-        .iter()
+        .par_iter()
         .filter(|(k, _)| !k.starts_with('_'))
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect::<Vec<(String, String)>>();
     values.retain(|item| {
         for (k, v) in filters.iter() {
             if k.ends_with("_lte") && v.parse::<f64>().is_ok() {
-                let value = item.get(k.trim_end_matches("_lte")).unwrap();
-                if value.is_number() && value.as_f64().unwrap() > v.parse::<f64>().unwrap() {
+                let k = k.trim_end_matches("_lte");
+                if let Some(value) = item.get(k) {
+                    if value.is_number() && value.as_f64().unwrap() > v.parse::<f64>().unwrap() {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             } else if k.ends_with("_gte") && v.parse::<f64>().is_ok() {
-                let value = item.get(k.trim_end_matches("_gte")).unwrap();
-                if value.is_number() && value.as_f64().unwrap() < v.parse::<f64>().unwrap() {
+                let k = k.trim_end_matches("_gte");
+                if let Some(value) = item.get(k) {
+                    if value.is_number() && value.as_f64().unwrap() < v.parse::<f64>().unwrap() {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             } else if k.ends_with("_lt") && v.parse::<f64>().is_ok() {
-                let value = item.get(k.trim_end_matches("_lt")).unwrap();
-                if value.is_number() && value.as_f64().unwrap() >= v.parse::<f64>().unwrap() {
+                let k = k.trim_end_matches("_lt");
+                if let Some(value) = item.get(k) {
+                    if value.is_number() && value.as_f64().unwrap() >= v.parse::<f64>().unwrap() {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             } else if k.ends_with("_gt") && v.parse::<f64>().is_ok() {
-                let value = item.get(k.trim_end_matches("_gt")).unwrap();
-                if value.is_number() && value.as_f64().unwrap() <= v.parse::<f64>().unwrap() {
+                let k = k.trim_end_matches("_gt");
+                if let Some(value) = item.get(k) {
+                    if value.is_number() && value.as_f64().unwrap() <= v.parse::<f64>().unwrap() {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             } else if k.ends_with("_ne") {
-                let value = item.get(k.trim_end_matches("_ne")).unwrap();
-                if (value.is_string() && value.as_str().unwrap() == v)
-                    || (value.is_number()
-                        && v.parse::<f64>().is_ok()
-                        && value.as_f64().unwrap() == v.parse::<f64>().unwrap())
-                    || (value.is_boolean()
-                        && value.as_bool().unwrap() == v.parse::<bool>().unwrap())
-                {
+                let k = k.trim_end_matches("_ne");
+                if let Some(value) = item.get(k) {
+                    if (value.is_string() && value.as_str().unwrap() == v)
+                        || (value.is_number()
+                            && v.parse::<f64>().is_ok()
+                            && value.as_f64().unwrap() == v.parse::<f64>().unwrap())
+                        || (value.is_boolean()
+                            && value.as_bool().unwrap() == v.parse::<bool>().unwrap())
+                    {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             } else if k.ends_with("_like") {
-                let value = item.get(k.trim_end_matches("_like")).unwrap();
-                if !value.is_string() || !value.as_str().unwrap().contains(v) {
+                let k = k.trim_end_matches("_like");
+                if let Some(value) = item.get(k) {
+                    if !value.is_string() || !value.as_str().unwrap().contains(v) {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             } else if k.ends_with("_nlike") {
-                let value = item.get(k.trim_end_matches("_nlike")).unwrap();
-                if !value.is_string() || value.as_str().unwrap().contains(v) {
+                let k = k.trim_end_matches("_nlike");
+                if let Some(value) = item.get(k) {
+                    if !value.is_string() || value.as_str().unwrap().contains(v) {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             } else if k.ends_with("_contains") {
-                let value = item.get(k.trim_end_matches("_contains")).unwrap();
-                if !value.is_array()
-                    || !value
-                        .as_array()
-                        .unwrap()
-                        .contains(&Value::String(v.to_string()))
-                {
+                let k = k.trim_end_matches("_contains");
+                if let Some(value) = item.get(k) {
+                    if !value.is_array()
+                        || !value
+                            .as_array()
+                            .unwrap()
+                            .contains(&Value::String(v.to_string()))
+                    {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             } else if k.ends_with("_ncontains") {
-                let value = item.get(k.trim_end_matches("_ncontains")).unwrap();
-                if !value.is_array()
-                    || value
-                        .as_array()
-                        .unwrap()
-                        .contains(&Value::String(v.to_string()))
-                {
+                let k = k.trim_end_matches("_ncontains");
+                if let Some(value) = item.get(k) {
+                    if !value.is_array()
+                        || value
+                            .as_array()
+                            .unwrap()
+                            .contains(&Value::String(v.to_string()))
+                    {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
-            } else {
-                let value = item.get(k).unwrap();
+            } else if k.ends_with("_exists") {
+                let k = k.trim_end_matches("_exists");
+                if item.get(k).is_none() {
+                    return false;
+                }
+            } else if k.ends_with("_nexists") {
+                let k = k.trim_end_matches("_nexists");
+                if item.get(k).is_some() {
+                    return false;
+                }
+            } else if let Some(value) = item.get(k) {
                 if (value.is_string() && value.as_str().unwrap() != v)
                     || (value.is_number()
                         && v.parse::<f64>().is_ok()
@@ -164,6 +210,8 @@ pub async fn list(
                 {
                     return false;
                 }
+            } else {
+                return false;
             }
         }
         true
@@ -222,13 +270,13 @@ pub async fn list(
     //3、page or slice
     let (start, end) = if let Some(paginate) = paginate {
         (
-            (if paginate.page > 0 {
-                paginate.page - 1
+            (if paginate.page.unwrap_or(1) > 0 {
+                paginate.page.unwrap_or(1) - 1
             } else {
                 0
             }) * paginate.size.unwrap_or(DEFAULT_PAGE_SIZE),
-            (if paginate.page > 0 {
-                paginate.page - 1
+            (if paginate.page.unwrap_or(1) > 0 {
+                paginate.page.unwrap_or(1) - 1
             } else {
                 0
             }) * paginate.size.unwrap_or(DEFAULT_PAGE_SIZE)
@@ -277,8 +325,8 @@ pub async fn get_item_by_id(
         .unwrap()
         .as_array()
         .unwrap()
-        .iter()
-        .find(|item| item[&app_state.id] == id)
+        .par_iter()
+        .find_any(|item| item[&app_state.id] == id)
     {
         Some(item) => Ok(item.clone().into()),
         None => Err((StatusCode::NOT_FOUND, "not found".to_string())),
@@ -310,7 +358,7 @@ pub async fn post_item(
         let value = match value.get(&app_state.id) {
             Some(id) => {
                 //check id
-                let id_exists = old_value.as_array().unwrap().iter().any(|item| {
+                let id_exists = old_value.as_array().unwrap().par_iter().any(|item| {
                     item.get(&app_state.id).unwrap().as_u64().unwrap() == id.as_u64().unwrap()
                 });
                 if id_exists {
@@ -323,9 +371,9 @@ pub async fn post_item(
                 let max_id = old_value
                     .as_array()
                     .unwrap()
-                    .iter()
+                    .par_iter()
                     .map(|item| item.get(&app_state.id).unwrap().as_u64().unwrap())
-                    .reduce(u64::max)
+                    .max()
                     .unwrap_or(0);
                 let mut value_clone = value.clone();
                 let value_with_id = value_clone.as_object_mut().unwrap();
@@ -371,6 +419,7 @@ pub async fn update_item_by_id(
                 *item = value_clone.clone();
                 *dirty = true;
                 drop(dirty);
+                break;
             }
         }
         Ok(value_clone.into())
@@ -419,7 +468,7 @@ pub async fn delete_item_by_id(
 #[derive(Deserialize, Clone)]
 pub struct Paginate {
     #[serde(rename = "_page")]
-    pub page: usize,
+    pub page: Option<usize>,
     #[serde(rename = "_size")]
     pub size: Option<usize>,
 }

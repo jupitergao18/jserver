@@ -49,7 +49,13 @@ async fn main() {
                 file.write_all(b"{}")
                     .await
                     .expect("Error writing database file");
-                file
+                match tokio::fs::File::open(&args.db_path).await {
+                    Ok(file) => file,
+                    Err(e) => {
+                        log::error!("Error opening database file after create: {}", e);
+                        panic!()
+                    }
+                }
             }
             _ => {
                 log::error!("Error opening database file: {}", e);

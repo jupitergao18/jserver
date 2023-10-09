@@ -89,20 +89,21 @@ For numbers, use the following suffix: `_lt`, `_lte`, `_gt`, `_gte` for `<`, `<=
 For strings, use `_like` for `contains` and `_nlike` for `not contains`. 
 For arrays, use `_contains` for `contains` and `_ncontains` for `not contains`. 
 For numbers, strings, booleans, use `_ne` for `!=`. 
-
+For fields, use `_exists` for `is not null` and `_nexists` for `is null`.
 
 ```
 GET    /api/posts?title_like=server
-GET    /api/posts?id_gt=1&id_lt=3
+GET    /api/posts?id_gt=1&id_lt=3&title_exists=true
 ```
 
 ### Paginate
 
-Use `_page` and optionally `_size` to paginate returned data.
+Use optional `_page` and optional `_size` to paginate returned data.
 
 ```
 GET /api/posts?_page=7
 GET /api/posts?_page=7&_size=20
+GET /api/posts?_size=100
 ```
 
 _20 items are returned by default, page is 1 based(0 is treated as 1)_
