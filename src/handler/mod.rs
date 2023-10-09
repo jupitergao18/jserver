@@ -18,12 +18,13 @@ mod upload;
 mod value;
 
 pub async fn build_router(app_state: AppState, args: Args) -> Router {
+    use rayon::prelude::*;
     let mut api_routers = Router::new();
     let db_value = app_state.db_value.read().await;
     let id = &app_state.id;
     for (key, value) in db_value.as_object().expect("Invalid json object").iter() {
         if value.is_array() {
-            let value_id_check = value.as_array().unwrap().iter().all(|item| {
+            let value_id_check = value.as_array().unwrap().par_iter().all(|item| {
                 item.is_object() && item.get(id).is_some() && item.get(id).unwrap().is_u64()
             });
             if !value_id_check {

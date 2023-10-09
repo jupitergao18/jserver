@@ -87,20 +87,21 @@ GET    /api/posts?id=1
 对于字符串，使用 `_like` 表示包含子字符串， `_nlike` 表示不包含子字符串。
 对于数组，使用 `_contains` 表示包含元素， `_ncontains` 表示不包含元素。
 对于数值、字符串和布尔值，使用 `_ne` 表示 `!=` 。 
-
+对于字段，使用 `_exists` 表示存在， `_nexists` 表示不存在。
 
 ```
 GET    /api/posts?title_like=server
-GET    /api/posts?id_gt=1&id_lt=3
+GET    /api/posts?id_gt=1&id_lt=3&title_exists=true
 ```
 
 ### 分页
 
-使用 `_page` 和可选的 `_size` 对返回数据进行分页。
+使用可选的 `_page` 和可选的 `_size` 对返回数据进行分页。
 
 ```
 GET /api/posts?_page=7
 GET /api/posts?_page=7&_size=20
+GET /api/posts?_size=100
 ```
 
 _默认每页返回 20 项，页号从 1 开始计数（ 0 当做 1 处理）。_
